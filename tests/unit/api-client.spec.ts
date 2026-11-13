@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, createPost, fetchPosts, setPostLike } from '@/lib/api'
+import { ApiError, createPost, fetchPosts, setPostFavorite, setPostLike } from '@/lib/api'
 import type { Post } from '@/lib/post'
 import { installApiMock, type ApiMock } from '../helpers/api-mock'
 
@@ -159,10 +159,88 @@ describe('api client', () => {
       'author',
       'content',
       'createdAt',
+      'favoritedByMe',
+      'favorites',
       'id',
       'likedByMe',
       'likes',
     ])
     expect(post.author).toBe('林晚')
+  })
+
+  it('setPostFavorite 用 PUT 命中 /favorite 并原样发送 favorited', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            id: 'p_1',
+            author: '林晚',
+            createdAt: NOW,
+            content: '收藏一下',
+            likes: 3,
+            likedByMe: false,
+            favorites: 5,
+            favoritedByMe: true,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const post = await setPostFavorite('p 1/2', true)
+
+    const [path, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(path).toBe('/api/posts/p%201%2F2/favorite')
+    expect(init.method).toBe('PUT')
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
+    expect(JSON.parse(String(init.body))).toEqual({ favorited: true })
+    expect(post.favoritedByMe).toBe(true)
+    expect(post.favorites).toBe(5)
+  })
+
+  it('setPostFavorite 取消收藏时发送 favorited: false', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            id: 'p_1',
+            author: '林晚',
+            createdAt: NOW,
+            content: '取消收藏',
+            likes: 0,
+            likedByMe: false,
+            favorites: 0,
+            favoritedByMe: false,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const post = await setPostFavorite('p_1', false)
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(String(init.body))).toEqual({ favorited: false })
+    expect(post.favoritedByMe).toBe(false)
+  })
+
+  it('setPostFavorite 的 404 映射为 NOT_FOUND 的 ApiError', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: { code: 'NOT_FOUND', message: '这条絮语不见了' } }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+      ),
+    )
+
+    const error = await rejectionOf(setPostFavorite('missing', true))
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error.status).toBe(404)
+    expect(error.code).toBe('NOT_FOUND')
+    expect(error.message).toBe('这条絮语不见了')
   })
 })

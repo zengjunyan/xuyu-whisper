@@ -93,3 +93,13 @@ export async function setPostLike(id: string, liked: boolean): Promise<Post> {
 
   return parsePost(payload)
 }
+
+export async function setPostFavorite(id: string, favorited: boolean): Promise<Post> {
+  const payload = await request(`${POSTS_ENDPOINT}/${encodeURIComponent(id)}/favorite`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ favorited }),
+  })
+
+  return parsePost(payload)
+}
