@@ -61,6 +61,18 @@ export function createApp(store: PostStore = createPostStore()): Hono {
     return c.json(post)
   })
 
+  app.put('/api/posts/:id/favorite', async (c) => {
+    const body = await readJsonObject(c)
+    if (!body || typeof body.favorited !== 'boolean') {
+      return fail(c, 400, 'INVALID_BODY', 'favorited 必须是布尔值')
+    }
+
+    const post = store.setFavorite(c.req.param('id'), body.favorited)
+    if (!post) return fail(c, 404, 'NOT_FOUND', '动态不存在')
+
+    return c.json(post)
+  })
+
   app.notFound((c) => fail(c, 404, 'NOT_FOUND', '接口不存在'))
 
   return app
