@@ -76,6 +76,7 @@ function onCompose(): void {
       :posts="posts.sortedPosts"
       :highlight-id="highlightId ?? undefined"
       @like="posts.toggleLike"
+      @favorite="posts.toggleFavorite"
       @compose="onCompose"
     />
 

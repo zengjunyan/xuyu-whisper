@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { ApiError, createPost, fetchPosts, setPostLike } from '@/lib/api'
+import { ApiError, createPost, fetchPosts, setPostFavorite, setPostLike } from '@/lib/api'
 import { ME, sanitizePost, sortPosts, type Post } from '@/lib/post'
 
 /** 发布后的冷却时间，避免连点产生重复动态 */
@@ -119,6 +119,31 @@ export const usePostsStore = defineStore('posts', () => {
     }
   }
 
+  /** 切换收藏：与点赞同构，先乐观更新界面，失败则回滚；未知 id 返回 null */
+  async function toggleFavorite(id: string): Promise<Post | null> {
+    const post = posts.value.find((item) => item.id === id)
+    if (!post) return null
+
+    const previous = { favorites: post.favorites, favoritedByMe: post.favoritedByMe }
+    const next = !previous.favoritedByMe
+
+    post.favoritedByMe = next
+    post.favorites = Math.max(0, previous.favorites + (next ? 1 : -1))
+
+    try {
+      const updated = await setPostFavorite(id, next)
+      post.favoritedByMe = updated.favoritedByMe
+      post.favorites = updated.favorites
+      error.value = null
+      return post
+    } catch (reason) {
+      post.favorites = previous.favorites
+      post.favoritedByMe = previous.favoritedByMe
+      error.value = messageOf(reason, '操作失败，请稍后重试')
+      return null
+    }
+  }
+
   return {
     posts,
     loaded,
@@ -132,5 +157,6 @@ export const usePostsStore = defineStore('posts', () => {
     load,
     publish,
     toggleLike,
+    toggleFavorite,
   }
 })

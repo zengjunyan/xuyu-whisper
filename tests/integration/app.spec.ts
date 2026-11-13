@@ -104,6 +104,69 @@ describe('App 集成', () => {
     expect(second.wrapper.find('.like-btn__count').text()).toBe('13')
   })
 
+  it('收藏状态在重新打开后依然保留', async () => {
+    const first = await mountApp()
+    const favBtn = first.wrapper.find('.fav-btn')
+
+    expect(favBtn.attributes('aria-pressed')).toBe('false')
+    await favBtn.trigger('click')
+    await flushPromises()
+    expect(favBtn.attributes('aria-pressed')).toBe('true')
+    expect(favBtn.find('.fav-btn__count').text()).toBe('5')
+
+    wrapper?.unmount()
+    wrapper = null
+
+    const second = await mountApp()
+    expect(second.wrapper.find('.fav-btn').attributes('aria-pressed')).toBe('true')
+    expect(second.wrapper.find('.fav-btn').find('.fav-btn__count').text()).toBe('5')
+  })
+
+  it('切到「我的收藏」只看到已收藏的卡片，切回全部恢复', async () => {
+    const app = await mountApp()
+    const target = app.posts.sortedPosts[0]
+    target.favoritedByMe = true
+    await nextTick()
+
+    await app.wrapper.find('#filter-favorites').trigger('click')
+
+    const cards = app.wrapper.findAll('.post')
+    expect(cards).toHaveLength(1)
+    expect(cards[0].attributes('data-id')).toBe(target.id)
+    expect(app.wrapper.find('.feed-head__count').text()).toBe('收藏 1 条')
+
+    await app.wrapper.find('#filter-all').trigger('click')
+
+    expect(app.wrapper.findAll('.post')).toHaveLength(4)
+    expect(app.wrapper.find('.feed-head__count').text()).toBe('共 4 条')
+  })
+
+  it('没有收藏时「我的收藏」展示收藏空状态，并能回到全部', async () => {
+    const app = await mountApp()
+
+    await app.wrapper.find('#filter-favorites').trigger('click')
+
+    expect(app.wrapper.findAll('.post')).toHaveLength(0)
+    expect(app.wrapper.find('.empty__title').text()).toBe('还没有收藏')
+    expect(app.wrapper.find('.feed-head__count').text()).toBe('暂无收藏')
+
+    await app.wrapper.find('#empty-reset').trigger('click')
+
+    expect(app.wrapper.find('#filter-all').attributes('aria-pressed')).toBe('true')
+    expect(app.wrapper.findAll('.post')).toHaveLength(4)
+  })
+
+  it('收藏失败时回滚并暴露错误文案', async () => {
+    const app = await mountApp()
+
+    api.failNextNetwork()
+    await app.wrapper.find('.fav-btn').trigger('click')
+    await flushPromises()
+
+    expect(app.wrapper.find('.fav-btn').attributes('aria-pressed')).toBe('false')
+    expect(app.posts.error).toContain('无法连接')
+  })
+
   it('主题选择写入本地存储并在重新打开后恢复', async () => {
     const first = await mountApp()
     const toggle = first.wrapper.find('#theme-toggle')

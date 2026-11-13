@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import PostCard from '@/components/PostCard.vue'
 import { avatarGradient, type Post } from '@/lib/post'
 
@@ -13,6 +13,8 @@ function makePost(patch: Partial<Post> = {}): Post {
     content: '傍晚收衣服的时候，风里有一点桂花味。',
     likes: 12,
     likedByMe: false,
+    favorites: 4,
+    favoritedByMe: false,
     ...patch,
   }
 }
@@ -57,6 +59,59 @@ describe('PostCard', () => {
     expect(liked.find('.like-btn').attributes('aria-pressed')).toBe('true')
     expect(liked.find('.like-btn').attributes('aria-label')).toBe('取消点赞，林晚')
     expect(liked.find('.like-btn__count').text()).toBe('13')
+  })
+
+  it('收藏按钮展示状态与计数，点击时向父级发出 favorite 事件', async () => {
+    const unfavorited = mountCard(makePost())
+    const button = unfavorited.find('.fav-btn')
+
+    expect(button.exists()).toBe(true)
+    expect(button.attributes('aria-pressed')).toBe('false')
+    expect(button.attributes('aria-label')).toBe('收藏，林晚')
+    expect(button.find('.fav-btn__count').text()).toBe('4')
+
+    await button.trigger('click')
+    expect(unfavorited.emitted('favorite')).toEqual([['p1']])
+    expect(unfavorited.emitted('like')).toBeUndefined()
+  })
+
+  it('已收藏的卡片按钮填充且文案改为取消收藏', () => {
+    const favorited = mountCard(makePost({ favoritedByMe: true, favorites: 5 }))
+    const button = favorited.find('.fav-btn')
+
+    expect(button.attributes('aria-pressed')).toBe('true')
+    expect(button.attributes('aria-label')).toBe('取消收藏，林晚')
+    expect(button.find('.fav-btn__count').text()).toBe('5')
+  })
+
+  it('收藏瞬间给图标加上跳动类，随后自动移除', async () => {
+    vi.useFakeTimers()
+    const wrapper = mountCard(makePost())
+    const button = wrapper.find('.fav-btn')
+
+    await button.trigger('click')
+    expect(button.classes()).toContain('is-popping')
+
+    vi.advanceTimersByTime(460)
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.fav-btn').classes()).not.toContain('is-popping')
+
+    vi.useRealTimers()
+  })
+
+  it('取消收藏时不触发跳动动画', async () => {
+    const wrapper = mountCard(makePost({ favoritedByMe: true, favorites: 5 }))
+
+    await wrapper.find('.fav-btn').trigger('click')
+    expect(wrapper.find('.fav-btn').classes()).not.toContain('is-popping')
+  })
+
+  it('点赞与收藏各用各的按钮', async () => {
+    const wrapper = mountCard(makePost())
+
+    await wrapper.find('.like-btn').trigger('click')
+    expect(wrapper.emitted('like')).toEqual([['p1']])
+    expect(wrapper.emitted('favorite')).toBeUndefined()
   })
 
   it('新发布的卡片带高亮类，并带入场序号', () => {

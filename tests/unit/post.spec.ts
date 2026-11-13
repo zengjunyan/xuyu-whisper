@@ -20,6 +20,8 @@ function makePost(patch: Partial<Record<string, unknown>> = {}): Record<string, 
     content: '风里有一点桂花味。',
     likes: 3,
     likedByMe: false,
+    favorites: 2,
+    favoritedByMe: false,
     ...patch,
   }
 }
@@ -82,6 +84,27 @@ describe('sanitizePost', () => {
     expect(sanitizePost(makePost({ likedByMe: 1 }))?.likedByMe).toBe(false)
   })
 
+  it('把非法收藏数归零，正数向下取整', () => {
+    expect(sanitizePost(makePost({ favorites: -3 }))?.favorites).toBe(0)
+    expect(sanitizePost(makePost({ favorites: Number.NaN }))?.favorites).toBe(0)
+    expect(sanitizePost(makePost({ favorites: Number.POSITIVE_INFINITY }))?.favorites).toBe(0)
+    expect(sanitizePost(makePost({ favorites: '5' }))?.favorites).toBe(0)
+    expect(sanitizePost(makePost({ favorites: 7.8 }))?.favorites).toBe(7)
+  })
+
+  it('只有 true 才算已收藏', () => {
+    expect(sanitizePost(makePost({ favoritedByMe: true }))?.favoritedByMe).toBe(true)
+    expect(sanitizePost(makePost({ favoritedByMe: 'true' }))?.favoritedByMe).toBe(false)
+    expect(sanitizePost(makePost({ favoritedByMe: 1 }))?.favoritedByMe).toBe(false)
+    expect(sanitizePost(makePost({ favoritedByMe: undefined }))?.favoritedByMe).toBe(false)
+  })
+
+  it('缺失收藏字段时补零', () => {
+    const post = sanitizePost({ id: 'x', content: '只有正文' })
+    expect(post?.favorites).toBe(0)
+    expect(post?.favoritedByMe).toBe(false)
+  })
+
   it('补齐缺失的 id 与非法时间', () => {
     const post = sanitizePost(makePost({ id: '', createdAt: 'x' }), 1_800_000_000_000)
     expect(post?.id).toMatch(/^p_/)
@@ -109,6 +132,8 @@ describe('sortPosts', () => {
         content: 'a',
         likes: 0,
         likedByMe: false,
+        favorites: 0,
+        favoritedByMe: false,
       },
       {
         id: 'c',
@@ -117,6 +142,8 @@ describe('sortPosts', () => {
         content: 'c',
         likes: 0,
         likedByMe: false,
+        favorites: 0,
+        favoritedByMe: false,
       },
       {
         id: 'b',
@@ -125,6 +152,8 @@ describe('sortPosts', () => {
         content: 'b',
         likes: 0,
         likedByMe: false,
+        favorites: 0,
+        favoritedByMe: false,
       },
     ]
 
@@ -149,6 +178,8 @@ describe('buildSeedPosts', () => {
       expect(post.createdAt).toBeLessThan(now)
       expect(post.likes).toBeGreaterThan(0)
       expect(post.likedByMe).toBe(false)
+      expect(post.favorites).toBeGreaterThan(0)
+      expect(post.favoritedByMe).toBe(false)
     })
     expect(sortPosts(seeds).map((post) => post.id)).toEqual(seeds.map((post) => post.id))
   })

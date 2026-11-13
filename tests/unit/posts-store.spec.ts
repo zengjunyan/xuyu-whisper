@@ -183,6 +183,82 @@ describe('posts store（后端 REST API）', () => {
     await expect(store.toggleLike('missing')).resolves.toBeNull()
   })
 
+  it('收藏立即生效（乐观更新）并同步到服务端', async () => {
+    const store = newStore()
+    await store.load()
+    const target = store.sortedPosts[0]
+    const before = { favorites: target.favorites, favoritedByMe: target.favoritedByMe }
+
+    const pending = store.toggleFavorite(target.id)
+    expect(target.favoritedByMe).toBe(true)
+    expect(target.favorites).toBe(before.favorites + 1)
+
+    const saved = await pending
+    expect(saved?.favoritedByMe).toBe(true)
+    expect(saved?.favorites).toBe(before.favorites + 1)
+
+    const serverPosts = (await api.serverPosts()) as Post[]
+    const serverPost = serverPosts.find((post) => post.id === target.id)
+    expect(serverPost?.favorites).toBe(before.favorites + 1)
+    expect(serverPost?.favoritedByMe).toBe(true)
+
+    const removed = await store.toggleFavorite(target.id)
+    expect(removed?.favoritedByMe).toBe(false)
+    expect(removed?.favorites).toBe(before.favorites)
+  })
+
+  it('取消收藏时计数不会掉到负数', async () => {
+    const store = newStore()
+    await store.load()
+    const target = store.sortedPosts[0]
+    target.favorites = 0
+    target.favoritedByMe = true
+
+    const pending = store.toggleFavorite(target.id)
+    expect(target.favorites).toBe(0)
+
+    await pending.catch(() => undefined)
+  })
+
+  it('收藏失败时回滚到原状态', async () => {
+    const store = newStore()
+    await store.load()
+    const target = store.sortedPosts[0]
+    const before = { favorites: target.favorites, favoritedByMe: target.favoritedByMe }
+
+    api.failNextNetwork()
+    const result = await store.toggleFavorite(target.id)
+
+    expect(result).toBeNull()
+    expect(target.favorites).toBe(before.favorites)
+    expect(target.favoritedByMe).toBe(before.favoritedByMe)
+    expect(store.error).toContain('无法连接')
+  })
+
+  it('收藏未知 id 返回 null 且不报错', async () => {
+    const store = newStore()
+    await store.load()
+
+    await expect(store.toggleFavorite('missing')).resolves.toBeNull()
+    expect(store.error).toBeNull()
+  })
+
+  it('点赞与收藏互不影响', async () => {
+    const store = newStore()
+    await store.load()
+    const target = store.sortedPosts[0]
+    const likesBefore = target.likes
+    const favoritesBefore = target.favorites
+
+    await store.toggleFavorite(target.id)
+    expect(target.likes).toBe(likesBefore)
+    expect(target.likedByMe).toBe(false)
+
+    await store.toggleLike(target.id)
+    expect(target.favoritedByMe).toBe(true)
+    expect(target.favorites).toBe(favoritesBefore + 1)
+  })
+
   it('统计文案随数量变化', async () => {
     const store = newStore()
     expect(store.countLabel).toBe('暂无内容')
