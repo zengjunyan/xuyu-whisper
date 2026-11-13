@@ -141,6 +141,26 @@ describe('App 集成', () => {
     expect(app.wrapper.find('.feed-head__count').text()).toBe('共 4 条')
   })
 
+  it('点击收藏后「我的收藏」立即出现该卡片，收藏数写入后端', async () => {
+    const app = await mountApp()
+    const target = app.posts.sortedPosts[0]
+    const before = target.favorites
+
+    await app.wrapper.find('.fav-btn').trigger('click')
+    await flushPromises()
+
+    expect(app.posts.posts.find((post) => post.id === target.id)?.favoritedByMe).toBe(true)
+    const serverPosts = (await api.serverPosts()) as Array<{ id: string; favorites: number }>
+    expect(serverPosts.find((post) => post.id === target.id)?.favorites).toBe(before + 1)
+
+    await app.wrapper.find('#filter-favorites').trigger('click')
+
+    const cards = app.wrapper.findAll('.post')
+    expect(cards).toHaveLength(1)
+    expect(cards[0].attributes('data-id')).toBe(target.id)
+    expect(app.wrapper.find('.feed-head__count').text()).toBe('收藏 1 条')
+  })
+
   it('没有收藏时「我的收藏」展示收藏空状态，并能回到全部', async () => {
     const app = await mountApp()
 

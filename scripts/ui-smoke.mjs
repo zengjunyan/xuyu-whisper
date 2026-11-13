@@ -125,9 +125,11 @@ const stored = await page.evaluate(async () => (await fetch('/api/posts')).json(
 assert.equal(stored.length, 5, '发布后应写入后端')
 assert.deepEqual(
   Object.keys(stored[0]).sort(),
-  ['author', 'content', 'createdAt', 'id', 'likedByMe', 'likes'],
-  'API 返回结构应与旧版字段一致',
+  ['author', 'content', 'createdAt', 'favoritedByMe', 'favorites', 'id', 'likedByMe', 'likes'],
+  'API 返回结构应包含点赞与收藏字段',
 )
+assert.equal(stored[0].favorites, 0, '新发布动态的收藏数应为 0')
+assert.equal(stored[0].favoritedByMe, false, '新发布动态默认未收藏')
 assert.equal(stored[0].content, shortPost)
 assert.equal(
   await page.evaluate(() => localStorage.getItem('whisper.posts.v1')),
@@ -153,7 +155,19 @@ const invalidBodyResponse = await page.request.put(apiUrl(`/api/posts/${stored[0
   data: { liked: 'yes' },
 })
 assert.equal(invalidBodyResponse.status(), 400, 'liked 非布尔值返回 400')
-log('REST 契约：空内容 400、非布尔 liked 400、未知资源 404')
+
+const invalidFavoriteResponse = await page.request.put(
+  apiUrl(`/api/posts/${stored[0].id}/favorite`),
+  { data: { favorited: 'yes' } },
+)
+assert.equal(invalidFavoriteResponse.status(), 400, 'favorited 非布尔值返回 400')
+assert.equal((await invalidFavoriteResponse.json()).error.code, 'INVALID_BODY')
+
+const missingFavoriteResponse = await page.request.put(apiUrl('/api/posts/not-exist/favorite'), {
+  data: { favorited: true },
+})
+assert.equal(missingFavoriteResponse.status(), 404, '未知动态收藏返回 404')
+log('REST 契约：空内容 400、非布尔 liked/favorited 400、未知资源 404')
 
 await page.locator('.feed-head').scrollIntoViewIfNeeded()
 await page.waitForTimeout(300)
@@ -182,6 +196,39 @@ assert.equal(await firstPost.locator('.like-btn__count').innerText(), '0')
 await firstPost.locator('.like-btn').click()
 assert.equal(await firstPost.locator('.like-btn__count').innerText(), '1')
 log('点赞、取消、再次点赞：状态、计数与无障碍标签同步')
+
+/* ---------- 5.1 收藏与「我的收藏」筛选 ---------- */
+firstPost = page.locator('.post').first()
+assert.equal(await firstPost.locator('.fav-btn').getAttribute('aria-pressed'), 'false')
+assert.equal(await firstPost.locator('.fav-btn').getAttribute('aria-label'), '收藏，我自己')
+assert.equal(await firstPost.locator('.fav-btn__count').innerText(), '0')
+
+await firstPost.locator('.fav-btn').click()
+assert.equal(await firstPost.locator('.fav-btn').getAttribute('aria-pressed'), 'true')
+assert.equal(await firstPost.locator('.fav-btn').getAttribute('aria-label'), '取消收藏，我自己')
+assert.equal(await firstPost.locator('.fav-btn__count').innerText(), '1')
+
+await page.click('#filter-favorites')
+assert.equal(await page.locator('#filter-favorites').getAttribute('aria-pressed'), 'true')
+assert.equal(await page.locator('#filter-all').getAttribute('aria-pressed'), 'false')
+assert.equal(await postCount(), 1, '「我的收藏」只展示已收藏动态')
+assert.equal(await page.locator('.feed-head__count').innerText(), '收藏 1 条')
+await page.screenshot({ path: `${SHOTS}/desktop-favorites.png` })
+
+await page.locator('.post .fav-btn').click()
+await page.waitForFunction(() => document.querySelectorAll('.post').length === 0)
+assert.equal(await page.locator('.empty__title').innerText(), '还没有收藏')
+assert.equal(await page.locator('.feed-head__count').innerText(), '暂无收藏')
+
+await page.locator('#empty-reset').click()
+assert.equal(await page.locator('#filter-all').getAttribute('aria-pressed'), 'true')
+assert.equal(await postCount(), 5, '回到全部后恢复完整时间线')
+assert.equal(await page.locator('.feed-head__count').innerText(), '共 5 条')
+
+// 重新收藏，供后续刷新持久化断言使用
+await page.locator('.post').first().locator('.fav-btn').click()
+assert.equal(await page.locator('.post').first().locator('.fav-btn__count').innerText(), '1')
+log('收藏、筛选、收藏空状态与「回到全部」：状态、计数与文案同步')
 
 /* ---------- 6. 长文展开 ---------- */
 const longPost = '凌晨写完最后一页，关灯之前听见楼下有人推着自行车走过，链条声很轻。'.repeat(5).slice(0, 200)
@@ -262,9 +309,19 @@ assert.equal(
   '1',
   '刷新后点赞数保持',
 )
+assert.equal(
+  await page.locator(`[data-id="${likedId}"] .fav-btn`).getAttribute('aria-pressed'),
+  'true',
+  '刷新后收藏保持',
+)
+assert.equal(
+  await page.locator(`[data-id="${likedId}"] .fav-btn__count`).innerText(),
+  '1',
+  '刷新后收藏数保持',
+)
 // 手动换背景只作用于本次会话，刷新后回到整点排期，与旧版行为一致
 assert.equal(await page.locator('.scene-chip__name').innerText(), sceneName, '刷新后回到整点排期')
-log('刷新后动态、点赞、点赞数、主题保持；手动壁纸回到排期')
+log('刷新后动态、点赞、收藏、主题保持；手动壁纸回到排期')
 
 /* ---------- 10. 快捷键发布 ---------- */
 await page.fill('#composer-input', '用快捷键发布')
@@ -300,8 +357,17 @@ assert.equal(
   true,
   '无横向滚动',
 )
+assert.equal(await page.locator('#filter-favorites').isVisible(), true, '移动端收藏页签可见')
+assert.equal(
+  await page.locator('.feed-filter').evaluate((el) => el.getBoundingClientRect().width <= 390),
+  true,
+  '筛选页签不应溢出屏幕',
+)
+await page.click('#filter-favorites')
+assert.equal(await postCount(), 1, '移动端「我的收藏」过滤生效')
+await page.click('#filter-all')
 await page.screenshot({ path: `${SHOTS}/mobile-light.png` })
-log('移动端 390px 布局正常，无横向滚动')
+log('移动端 390px 布局与收藏筛选正常，无横向滚动')
 
 /* ---------- 14. 跨整点自动换壁纸（独立上下文，模拟时间前进） ---------- */
 const clockContext = await browser.newContext({
