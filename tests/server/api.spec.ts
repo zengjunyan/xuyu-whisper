@@ -33,6 +33,12 @@ function newApp() {
         headers: { 'Content-Type': 'application/json' },
         body: typeof body === 'string' ? body : JSON.stringify(body),
       }),
+    favorite: (id: string, body: unknown) =>
+      app.request(`/api/posts/${id}/favorite`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: typeof body === 'string' ? body : JSON.stringify(body),
+      }),
   }
 }
 
@@ -89,10 +95,21 @@ describe('GET /api/posts', () => {
       'author',
       'content',
       'createdAt',
+      'favoritedByMe',
+      'favorites',
       'id',
       'likedByMe',
       'likes',
     ])
+  })
+
+  it('示例动态带收藏数且初始未收藏', async () => {
+    const { list } = newApp()
+    const posts = await list()
+
+    expect(posts.find((post) => post.id === 'seed-linwan')?.favorites).toBe(4)
+    expect(posts.find((post) => post.id === 'seed-nanzhi')?.favorites).toBe(9)
+    expect(posts.every((post) => post.favoritedByMe === false)).toBe(true)
   })
 
   it('一次 GET 返回的数组被修改后不影响仓库', async () => {
@@ -118,6 +135,8 @@ describe('POST /api/posts', () => {
       'author',
       'content',
       'createdAt',
+      'favoritedByMe',
+      'favorites',
       'id',
       'likedByMe',
       'likes',
@@ -126,6 +145,8 @@ describe('POST /api/posts', () => {
     expect(post.author).toBe(ME)
     expect(post.likes).toBe(0)
     expect(post.likedByMe).toBe(false)
+    expect(post.favorites).toBe(0)
+    expect(post.favoritedByMe).toBe(false)
     expect(post.createdAt).toBe(NOW)
     expect(post.id.startsWith('p_')).toBe(true)
 
@@ -261,6 +282,112 @@ describe('PUT /api/posts/:id/like', () => {
     expect(response.status).toBe(400)
     const payload = (await response.json()) as ApiError
     expect(payload.error.code).toBe('INVALID_BODY')
+  })
+})
+
+describe('PUT /api/posts/:id/favorite', () => {
+  it('收藏后计数加一且标记已收藏', async () => {
+    const { app, favorite } = newApp()
+    const before = (await (await app.request('/api/posts')).json()) as Post[]
+    const target = before[0]
+
+    const response = await favorite(target.id, { favorited: true })
+
+    expect(response.status).toBe(200)
+    const post = (await response.json()) as Post
+    expect(post.id).toBe(target.id)
+    expect(post.favoritedByMe).toBe(true)
+    expect(post.favorites).toBe(target.favorites + 1)
+  })
+
+  it('重复收藏保持幂等', async () => {
+    const { app, favorite } = newApp()
+    const target = ((await (await app.request('/api/posts')).json()) as Post[])[0]
+
+    await favorite(target.id, { favorited: true })
+    const response = await favorite(target.id, { favorited: true })
+    const post = (await response.json()) as Post
+
+    expect(post.favorites).toBe(target.favorites + 1)
+    expect(post.favoritedByMe).toBe(true)
+  })
+
+  it('取消收藏回到原值', async () => {
+    const { app, favorite } = newApp()
+    const target = ((await (await app.request('/api/posts')).json()) as Post[])[0]
+
+    await favorite(target.id, { favorited: true })
+    const response = await favorite(target.id, { favorited: false })
+    const post = (await response.json()) as Post
+
+    expect(post.favoritedByMe).toBe(false)
+    expect(post.favorites).toBe(target.favorites)
+  })
+
+  it('收藏数不会降到负数', async () => {
+    const { create, favorite } = newApp()
+    const created = (await (await create({ content: '没人收藏的絮语' })).json()) as Post
+
+    const response = await favorite(created.id, { favorited: false })
+    const post = (await response.json()) as Post
+
+    expect(post.favorites).toBe(0)
+    expect(post.favoritedByMe).toBe(false)
+  })
+
+  it('收藏写入后可在列表读到', async () => {
+    const { favorite, list } = newApp()
+
+    await favorite('seed-aju', { favorited: true })
+
+    const posts = await list()
+    const target = posts.find((post) => post.id === 'seed-aju')
+    expect(target?.favorites).toBe(3)
+    expect(target?.favoritedByMe).toBe(true)
+  })
+
+  it('未知 id 返回 404 NOT_FOUND', async () => {
+    const { favorite } = newApp()
+    const response = await favorite('missing', { favorited: true })
+
+    expect(response.status).toBe(404)
+    const payload = (await response.json()) as ApiError
+    expect(payload.error.code).toBe('NOT_FOUND')
+    expect(payload.error.message).toBe('动态不存在')
+  })
+
+  it.each([
+    ['favorited 不是布尔值', { favorited: 'yes' }],
+    ['缺少 favorited', {}],
+    ['非法 JSON', '{'],
+  ])('%s 返回 400 INVALID_BODY', async (_name, body) => {
+    const { favorite } = newApp()
+    const response = await favorite('seed-linwan', body)
+
+    expect(response.status).toBe(400)
+    const payload = (await response.json()) as ApiError
+    expect(payload.error.code).toBe('INVALID_BODY')
+    expect(payload.error.message).toBe('favorited 必须是布尔值')
+  })
+
+  it('点赞与收藏互不影响', async () => {
+    const { app, like, favorite } = newApp()
+    const target = ((await (await app.request('/api/posts')).json()) as Post[])[0]
+
+    const liked = (await (await like(target.id, { liked: true })).json()) as Post
+    expect(liked.likes).toBe(target.likes + 1)
+    expect(liked.favorites).toBe(target.favorites)
+    expect(liked.favoritedByMe).toBe(false)
+
+    const favorited = (await (await favorite(target.id, { favorited: true })).json()) as Post
+    expect(favorited.likes).toBe(liked.likes)
+    expect(favorited.likedByMe).toBe(true)
+    expect(favorited.favorites).toBe(target.favorites + 1)
+
+    const unliked = (await (await like(target.id, { liked: false })).json()) as Post
+    expect(unliked.likes).toBe(target.likes)
+    expect(unliked.favorites).toBe(target.favorites + 1)
+    expect(unliked.favoritedByMe).toBe(true)
   })
 })
 

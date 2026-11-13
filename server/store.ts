@@ -17,6 +17,7 @@ export interface PostStore {
   list(): Post[]
   create(input: CreatePostInput): Post | null
   setLike(id: string, liked: boolean): Post | null
+  setFavorite(id: string, favorited: boolean): Post | null
   reset(): void
 }
 
@@ -49,6 +50,8 @@ export function createPostStore(options: PostStoreOptions = {}): PostStore {
           createdAt: now(),
           likes: 0,
           likedByMe: false,
+          favorites: 0,
+          favoritedByMe: false,
         },
         now(),
       )
@@ -65,6 +68,18 @@ export function createPostStore(options: PostStoreOptions = {}): PostStore {
       if (post.likedByMe !== liked) {
         post.likedByMe = liked
         post.likes = Math.max(0, post.likes + (liked ? 1 : -1))
+      }
+
+      return { ...post }
+    },
+
+    setFavorite(id, favorited) {
+      const post = ensure().find((item) => item.id === id)
+      if (!post) return null
+
+      if (post.favoritedByMe !== favorited) {
+        post.favoritedByMe = favorited
+        post.favorites = Math.max(0, post.favorites + (favorited ? 1 : -1))
       }
 
       return { ...post }
