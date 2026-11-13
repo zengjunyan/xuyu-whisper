@@ -1,0 +1,10 @@
+# 图片按二进制处理，避免文本 diff 与换行转换
+*.jpg binary
+*.jpeg binary
+*.png binary
+
+# 代码与文档保持原样
+*.html text
+*.css text
+*.js text
+*.md text
