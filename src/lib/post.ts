@@ -4,8 +4,14 @@ export interface Post {
   author: string
   createdAt: number
   content: string
+  /** 点赞总数 */
   likes: number
+  /** 当前用户是否已点赞 */
   likedByMe: boolean
+  /** 收藏总数 */
+  favorites: number
+  /** 当前用户是否已收藏 */
+  favoritedByMe: boolean
 }
 
 /** 正文上限 */
@@ -51,6 +57,11 @@ export function sanitizePost(raw: unknown, now: number = Date.now()): Post | nul
       ? Math.floor(record.likes)
       : 0
 
+  const favorites =
+    typeof record.favorites === 'number' && Number.isFinite(record.favorites) && record.favorites > 0
+      ? Math.floor(record.favorites)
+      : 0
+
   return {
     id: typeof record.id === 'string' && record.id ? record.id : createId(now),
     author,
@@ -61,6 +72,8 @@ export function sanitizePost(raw: unknown, now: number = Date.now()): Post | nul
     content: content.slice(0, MAX_LEN),
     likes,
     likedByMe: record.likedByMe === true,
+    favorites,
+    favoritedByMe: record.favoritedByMe === true,
   }
 }
 
@@ -84,6 +97,8 @@ export function buildSeedPosts(now: number = Date.now()): Post[] {
         '傍晚收衣服的时候，风里有一点桂花味。秋天好像终于把脚伸进了这座城市，轻轻的，怕吵到谁。',
       likes: 12,
       likedByMe: false,
+      favorites: 4,
+      favoritedByMe: false,
     },
     {
       id: 'seed-aju',
@@ -93,6 +108,8 @@ export function buildSeedPosts(now: number = Date.now()): Post[] {
         '今天把阳台那几盆多肉重新换了土，弄了一手泥。明明只是浇水换盆这种小事，成就感却莫名其妙地高。',
       likes: 8,
       likedByMe: false,
+      favorites: 2,
+      favoritedByMe: false,
     },
     {
       id: 'seed-shen',
@@ -101,6 +118,8 @@ export function buildSeedPosts(now: number = Date.now()): Post[] {
       content: '重读一本旧书，才发现当年划线的句子，现在读来完全是另一层意思。书没变，是我变了。',
       likes: 21,
       likedByMe: false,
+      favorites: 6,
+      favoritedByMe: false,
     },
     {
       id: 'seed-nanzhi',
@@ -110,6 +129,8 @@ export function buildSeedPosts(now: number = Date.now()): Post[] {
         '凌晨写完最后一页，关灯之前听见楼下有人推着自行车走过，链条声很轻。城市安静下来的时候，才听得见它呼吸。',
       likes: 34,
       likedByMe: false,
+      favorites: 9,
+      favoritedByMe: false,
     },
   ]
 
