@@ -1,5 +1,18 @@
-# IDE 本地状态
+# 依赖与构建产物
+node_modules/
+dist/
+coverage/
+coverage-report/
+.vite/
+
+# 验收截图
+artifacts/
+.playwright-cli/
+
+# IDE 本地状态 / AI 工具缓存
 .codebuddy/
+.agents/
+skills-lock.json
 
 # 系统文件
 .DS_Store

@@ -1,197 +1,37 @@
 <!DOCTYPE html>
 <html lang="zh-CN" data-theme="light" data-theme-mode="system">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#FAF6EF" id="theme-color-meta" />
-  <meta name="description" content="絮语 Whisper —— 一个只在你的设备上运行的轻量动态记录应用。" />
-  <title>絮语 Whisper · 把此刻轻轻放下</title>
-  <script>
-    // 首屏绘制前确定主题：system 跟随系统，light / dark 为手动覆盖
-    (function () {
-      var mode = "system";
-      try {
-        mode = localStorage.getItem("whisper.theme.v2") || "system";
-      } catch (err) {
-        mode = "system";
-      }
-      if (mode !== "light" && mode !== "dark" && mode !== "system") mode = "system";
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FAF6EF" id="theme-color-meta" />
+    <meta name="description" content="絮语 Whisper —— 一个只在你的设备上运行的轻量动态记录应用。" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <title>絮语 Whisper · 把此刻轻轻放下</title>
+    <script>
+      // 首屏绘制前确定主题：system 跟随系统，light / dark 为手动覆盖
+      (function () {
+        var mode = "system";
+        try {
+          mode = localStorage.getItem("whisper.theme.v2") || "system";
+        } catch (err) {
+          mode = "system";
+        }
+        if (mode !== "light" && mode !== "dark" && mode !== "system") mode = "system";
 
-      var prefersDark =
-        window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-      var resolved = mode === "system" ? (prefersDark ? "dark" : "light") : mode;
+        var prefersDark =
+          window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        var resolved = mode === "system" ? (prefersDark ? "dark" : "light") : mode;
 
-      document.documentElement.dataset.theme = resolved;
-      document.documentElement.dataset.themeMode = mode;
-    })();
-  </script>
-  <link rel="stylesheet" href="styles.css" />
-  <script src="app.js" defer></script>
-</head>
-<body>
-  <div class="scene-stack" aria-hidden="true">
-    <div class="scene-layer" data-scene="a"></div>
-    <div class="scene-layer" data-scene="b"></div>
-    <div class="scene-veil"></div>
-    <div class="scene-glow"></div>
-    <div class="scene-grain"></div>
-  </div>
-
-  <a class="skip-link" href="#composer-input">跳到发布框</a>
-
-  <header class="topbar">
-    <div class="topbar__inner">
-      <a class="brand" href="./index.html" aria-label="絮语 Whisper 首页">
-        <span class="brand__mark" aria-hidden="true">絮</span>
-        <span class="brand__text">
-          <strong class="brand__cn">絮语</strong>
-          <em class="brand__en">Whisper</em>
-        </span>
-      </a>
-
-      <div class="topbar__actions">
-        <button
-          class="icon-btn icon-btn--scene"
-          id="scene-next"
-          type="button"
-          aria-label="换一张背景"
-          title="换一张背景"
-        >
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <rect x="3.2" y="5.2" width="17.6" height="13.6" rx="2.4" fill="none" stroke="currentColor" stroke-width="1.6" />
-            <circle cx="8.6" cy="10.2" r="1.7" fill="none" stroke="currentColor" stroke-width="1.5" />
-            <path d="M4.6 17.2l4.6-4.3 3.2 2.9 3-2.7 4 4.1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
-          </svg>
-        </button>
-
-        <button
-          class="icon-btn icon-btn--theme"
-          id="theme-toggle"
-          type="button"
-          aria-label="当前跟随系统，点击切换为浅色"
-          aria-pressed="false"
-          title="明暗主题：跟随系统"
-        >
-          <svg class="icon icon--sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.7" />
-            <g stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
-              <path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.4 5.4l1.6 1.6M17 17l1.6 1.6M18.6 5.4L17 7M7 17l-1.6 1.6" />
-            </g>
-          </svg>
-          <svg class="icon icon--moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path
-              d="M20.2 14.4A8.6 8.6 0 0 1 9.6 3.8a8.7 8.7 0 1 0 10.6 10.6Z"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.7"
-              stroke-linejoin="round"
-            />
-          </svg>
-          <span class="theme-dot" aria-hidden="true"></span>
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <main class="shell">
-    <section class="intro" aria-labelledby="intro-title">
-      <div class="intro__top">
-        <p class="intro__date" id="today-label">今天</p>
-        <span class="scene-chip" id="scene-chip" title="当前背景">
-          <span class="scene-chip__dot" aria-hidden="true"></span>
-          <span class="scene-chip__name" id="scene-name">晨雾</span>
-        </span>
-      </div>
-      <h1 class="intro__title" id="intro-title">把此刻，轻轻放下</h1>
-      <p class="intro__sub">没有推荐，没有打扰，只有你自己的时间线。</p>
-    </section>
-
-    <section class="composer" aria-labelledby="composer-title">
-      <div class="composer__head">
-        <span class="avatar avatar--me" id="me-avatar" aria-hidden="true">我</span>
-        <div class="composer__id">
-          <h2 class="composer__name" id="composer-title">我自己</h2>
-          <p class="composer__hint">此刻，心里飘着什么？</p>
-        </div>
-      </div>
-
-      <label class="visually-hidden" for="composer-input">动态内容</label>
-      <textarea
-        class="composer__input"
-        id="composer-input"
-        rows="3"
-        maxlength="280"
-        placeholder="此刻，想说点什么？"
-        spellcheck="false"
-      ></textarea>
-
-      <div class="composer__foot">
-        <div class="meter" id="meter" role="status" aria-live="off">
-          <span class="meter__num" id="char-count">280</span>
-          <span class="meter__unit">字可写</span>
-        </div>
-        <button class="btn btn--primary" id="publish-btn" type="button" disabled>
-          <svg class="btn__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M4.5 12.2 19.4 5.1c.6-.3 1.2.3 1 .9l-2.8 12.6c-.2.7-1 .9-1.5.4l-4-3.5-2.6 2.6c-.4.4-1.1.2-1.2-.4l-.7-4.2-3.4-1.2c-.7-.2-.7-1.2.3-1.6Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
-          </svg>
-          发布
-        </button>
-      </div>
-      <p class="composer__tip" id="composer-tip">按 Ctrl / ⌘ + Enter 也可以快速发布</p>
-    </section>
-
-    <section class="feed-section" aria-labelledby="feed-title">
-      <div class="feed-head">
-        <h2 class="feed-head__title" id="feed-title">最新絮语</h2>
-        <span class="feed-head__count" id="feed-count">—</span>
-      </div>
-
-      <div class="feed" id="feed" aria-live="polite"></div>
-
-      <div class="empty" id="empty-state" hidden>
-        <svg class="empty__art" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
-          <circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="3 7" opacity=".5" />
-          <path d="M38 44h44a6 6 0 0 1 6 6v26a6 6 0 0 1-6 6H52l-12 9v-9h-2a6 6 0 0 1-6-6V50a6 6 0 0 1 6-6Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
-          <path d="M48 58h24M48 68h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-        </svg>
-        <h3 class="empty__title">这里还很安静</h3>
-        <p class="empty__text">写下第一条絮语，让时间线有了起点。</p>
-        <button class="btn btn--ghost" id="empty-cta" type="button">写下第一条</button>
-      </div>
-    </section>
-
-    <footer class="footer">
-      <p class="footer__line">絮语 Whisper · 极简本地动态</p>
-      <p class="footer__note">所有内容仅保存在此设备的浏览器中，不会上传到任何服务器。</p>
-    </footer>
-  </main>
-
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
-
-  <noscript>
-    <p class="noscript">絮语需要启用 JavaScript 才能使用，请在浏览器设置中开启后刷新页面。</p>
-  </noscript>
-
-  <template id="post-card-tpl">
-    <article class="post">
-      <header class="post__head">
-        <span class="avatar post__avatar" aria-hidden="true"></span>
-        <div class="post__meta">
-          <span class="post__author"></span>
-          <time class="post__time"></time>
-        </div>
-        <span class="post__seal" aria-hidden="true">絮</span>
-      </header>
-      <p class="post__body"></p>
-      <footer class="post__foot">
-        <button class="like-btn" type="button" aria-pressed="false" aria-label="点赞">
-          <svg class="like-btn__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M12 20.1s-7.4-4.6-7.4-9.4A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7.4 3.1c0 4.8-7.4 9.4-7.4 9.4Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
-          </svg>
-          <span class="like-btn__count">0</span>
-        </button>
-      </footer>
-    </article>
-  </template>
-</body>
+        document.documentElement.dataset.theme = resolved;
+        document.documentElement.dataset.themeMode = mode;
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <noscript>
+      <p class="noscript">絮语需要启用 JavaScript 才能使用，请在浏览器设置中开启后刷新页面。</p>
+    </noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>
